@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>별빛 작전 — 에듀테크 보훈교육</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="styles.css" />
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+
+<div class="starfield" aria-hidden="true"></div>
+
+<div id="root"></div>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="screens.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accent": "#e8cf7a",
+  "displayFont": "Noto Serif KR",
+  "starfield": true
+}/*EDITMODE-END*/;
+
+const SCREENS = [
+  "intro", "history", "moon", "timeline", "polaris", "route", "plan", "result",
+];
+
+function App() {
+  const [step, setStep] = useState(0);
+
+  // 작전번호: 세션마다 고정 (리렌더링마다 바뀌지 않음)
+  const [operationNo] = useState(() => String(Math.floor(Math.random() * 99) + 1).padStart(3, "0"));
+
+  const [state, setState] = useState({
+    observations: [],
+    moonPhase: null,
+    timeSlot: null,
+    polaris: null,
+    route: null,
+    rationale: "",
+    reflection: "",
+  });
+
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  // Apply tweaks to CSS vars
+  useEffect(() => {
+    document.documentElement.style.setProperty("--color-accent", t.accent);
+    document.documentElement.style.setProperty("--color-star-300", t.accent);
+    document.documentElement.style.setProperty(
+      "--font-display",
+      `"${t.displayFont}", "Nanum Myeongjo", serif`
+    );
+    document.querySelector(".starfield").style.display = t.starfield ? "" : "none";
+  }, [t]);
+
+  const total = SCREENS.length - 1; // exclude intro from progress count → 7 steps
+  const isIntro = step === 0;
+  const navStep = step - 1; // for navbar (0..6)
+
+  const onNext = () => setStep(s => Math.min(s + 1, SCREENS.length - 1));
+  const onPrev = () => setStep(s => Math.max(s - 1, 0));
+  const onRestart = () => { setStep(0); setState({ observations: [], moonPhase: null, timeSlot: null, polaris: null, route: null, rationale: "", reflection: "" }); };
+
+  const navProps = { step: navStep, total, onPrev, onNext };
+
+  return (
+    <div className="app" data-screen-label={`${String(step+1).padStart(2,"0")} ${SCREENS[step]}`}>
+      {!isIntro && (
+        <div className="app__brand">별빛 작전 · 보훈교육 시뮬레이션</div>
+      )}
+
+      {step === 0 && <IntroScreen onStart={onNext} />}
+      {step === 1 && <HistoryCardScreen state={state} setState={setState} {...navProps} />}
+      {step === 2 && <MoonPhaseScreen   state={state} setState={setState} {...navProps} />}
+      {step === 3 && <TimelineScreen    state={state} setState={setState} {...navProps} />}
+      {step === 4 && <PolarisScreen     state={state} setState={setState} {...navProps} />}
+      {step === 5 && <RouteScreen       state={state} setState={setState} {...navProps} />}
+      {step === 6 && <PlanScreen        state={state} setState={setState} operationNo={operationNo} {...navProps} />}
+      {step === 7 && <ResultScreen      state={state} {...navProps} onRestart={onRestart} />}
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="비주얼">
+          <TweakColor
+            label="별빛 강조색"
+            value={t.accent}
+            onChange={v => setTweak("accent", v)}
+            options={["#e8cf7a", "#c9a9e0", "#9ec6e8", "#e6b08c"]}
+          />
+          <TweakRadio
+            label="제목 폰트"
+            value={t.displayFont}
+            onChange={v => setTweak("displayFont", v)}
+            options={[
+              { value: "Noto Serif KR", label: "정통" },
+              { value: "Pretendard Variable", label: "모던" },
+            ]}
+          />
+          <TweakToggle
+            label="별빛 배경"
+            value={t.starfield}
+            onChange={v => setTweak("starfield", v)}
+          />
+        </TweakSection>
+        <TweakSection title="네비게이션">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+            {SCREENS.map((s, i) => (
+              <button
+                key={s}
+                onClick={() => setStep(i)}
+                style={{
+                  padding: "8px 4px",
+                  background: step === i ? "var(--color-star-300)" : "transparent",
+                  color: step === i ? "var(--color-night-900)" : "var(--color-text)",
+                  border: "1px solid var(--color-border-strong)",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontSize: 11,
+                  fontFamily: "inherit",
+                }}
+              >
+                {String(i+1).padStart(2,"0")}
+              </button>
+            ))}
+          </div>
+        </TweakSection>
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+
+</body>
+</html>
