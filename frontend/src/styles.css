@@ -502,6 +502,26 @@
 }
 .header__panel-login-btn { padding: 0 16px 16px; }
 
+/* ── Google 로그인 버튼 ──────────────────────────────────── */
+.btn-google {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  padding: 9px 14px;
+  background: #fff;
+  color: #3c4043;
+  border: 1px solid #dadce0;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+.btn-google:hover {
+  background: #f8f9fa;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
 /* ── Empty / Error states ───────────────────────────────── */
 .empty-state {
   text-align: center; padding: var(--space-16) var(--space-8);

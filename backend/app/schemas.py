@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 class GoogleLoginRequest(BaseModel):
     credential: str
+    token_type: str = "id_token"  # "id_token" 또는 "access_token"
 
 
 class UserOut(BaseModel):

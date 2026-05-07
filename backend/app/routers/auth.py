@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.schemas import GoogleLoginRequest, UserOut
-from app.auth import verify_google_token, create_jwt, get_current_user_id
+from app.auth import verify_google_token, verify_google_access_token, create_jwt, get_current_user_id
 from app.config import settings
 
 router = APIRouter()
@@ -11,7 +11,10 @@ router = APIRouter()
 
 @router.post("/google")
 def google_login(body: GoogleLoginRequest, response: Response, db: Session = Depends(get_db)):
-    idinfo = verify_google_token(body.credential)
+    if body.token_type == "access_token":
+        idinfo = verify_google_access_token(body.credential)
+    else:
+        idinfo = verify_google_token(body.credential)
 
     google_sub = idinfo["sub"]
     email = idinfo.get("email", "")
