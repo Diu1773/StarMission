@@ -22,8 +22,8 @@ export function AuthProvider({ children }) {
     fetchMe();
   }, [fetchMe]);
 
-  const loginWithGoogle = async (credential) => {
-    const res = await authApi.googleLogin(credential);
+  const loginWithGoogle = async (credential, tokenType = "id_token") => {
+    const res = await authApi.googleLogin(credential, tokenType);
     setUser(res.user);
     return res.user;
   };
