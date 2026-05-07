@@ -268,9 +268,17 @@ function InfoCard({ card, navProps }) {
         <div className="img-frame" style={{ minHeight: 240 }}>
           <ImgWithFallback src={card.image} alt={card.imageAlt} fallbackLabel={card.imageFallbackLabel} fallbackHint={card.imageFallbackHint} style={{ minHeight: 240 }} />
         </div>
-        <div className="hint" style={{ alignSelf: "flex-start", marginTop: 0 }}>
-          <div className="question__label" style={{ marginBottom: 8 }}>탐구 질문</div>
-          <p style={{ margin: 0, fontSize: "var(--text-base)", lineHeight: "var(--leading-loose)" }}>{card.question}</p>
+        <div style={{ alignSelf: "flex-start", marginTop: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="hint">
+            <div className="question__label" style={{ marginBottom: 8 }}>탐구 질문</div>
+            <p style={{ margin: 0, fontSize: "var(--text-base)", lineHeight: "var(--leading-loose)" }}>{card.question}</p>
+          </div>
+          {card.historicalNote && (
+            <div className="historical-note">
+              <div className="historical-note__label">📜 실제 역사 기록</div>
+              <p style={{ margin: 0, lineHeight: "var(--leading-loose)" }}>{card.historicalNote}</p>
+            </div>
+          )}
         </div>
       </div>
     </CardFrame>
