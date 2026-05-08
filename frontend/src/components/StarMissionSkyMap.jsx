@@ -172,80 +172,20 @@ function drawPine(ctx, x, baseY, treeH) {
   ctx.fill();
 }
 
-// ── WebGL Milky Way ────────────────────────────────────────────────────────────
-function s01(v) { const t=Math.max(0,Math.min(1,v)); return t*t*(3-2*t); }
-function h2d(x,y) { const s=Math.sin(x*127.1+y*311.7)*43758.5453; return s-Math.floor(s); }
-function n2d(x,y,px) {
-  const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;
-  const w0=((xi%px)+px)%px,w1=(w0+1)%px;
-  const v00=h2d(w0,yi),v10=h2d(w1,yi),v01=h2d(w0,yi+1),v11=h2d(w1,yi+1);
-  const u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
-  return(v00*(1-u)+v10*u)*(1-v)+(v01*(1-u)+v11*u)*v;
-}
-function fbm(x,y,px,o){let a=.5,f=1,s=0,n=0;for(let i=0;i<o;i++){s+=a*n2d(x*f,y*f,px);n+=a;a*=.5;f*=2;}return s/n;}
-const EQ2G=[[-0.0548755604,-0.8734370902,-0.4838350155],[0.4941094279,-0.4448296300,0.7469822445],[-0.8676661490,-0.1980763734,0.4559837762]];
-function e2g(ra,dec){
-  const r=ra*Math.PI/180,d=dec*Math.PI/180;
-  const ex=Math.cos(d)*Math.cos(r),ey=Math.cos(d)*Math.sin(r),ez=Math.sin(d);
-  const gx=EQ2G[0][0]*ex+EQ2G[0][1]*ey+EQ2G[0][2]*ez,gy=EQ2G[1][0]*ex+EQ2G[1][1]*ey+EQ2G[1][2]*ez,gz=EQ2G[2][0]*ex+EQ2G[2][1]*ey+EQ2G[2][2]*ez;
-  let l=Math.atan2(gy,gx)*180/Math.PI;if(l<0)l+=360;
-  return[l,Math.asin(Math.max(-1,Math.min(1,gz)))*180/Math.PI];
-}
-function gd(l,b,l0,b0){return Math.acos(Math.max(-1,Math.min(1,Math.sin(b*Math.PI/180)*Math.sin(b0*Math.PI/180)+Math.cos(b*Math.PI/180)*Math.cos(b0*Math.PI/180)*Math.cos((l-l0)*Math.PI/180))))*180/Math.PI;}
-
-let mwProm=null;
-function buildMW(){
-  if(mwProm)return mwProm;
-  mwProm=new Promise(res=>setTimeout(()=>{
-    const W=1024,H=512,data=new Uint8ClampedArray(W*H*4);
-    for(let y=0;y<H;y++){const dec=90-((y+.5)/H)*180,vR=(dec+90)/180;
-      for(let x=0;x<W;x++){
-        const ra=((x+.5)/W)*360,[l,b]=e2g(ra,dec),lN=l/360,bA=Math.abs(b);
-        // 더 넓고 부드러운 띠 (bA/4.5→/7, 1.55→1.25 → soft falloff)
-        const thin=Math.exp(-Math.pow(bA/7.0,1.25)),wide=Math.exp(-Math.pow(bA/22,1.0));
-        const dGC=gd(l,b,0,0),bulge=Math.exp(-Math.pow(dGC/14,1.5)),bW=Math.exp(-Math.pow(dGC/30,1.15));
-        const sgr=Math.exp(-Math.pow(gd(l,b,7,-3)/12,1.5)),cyg=Math.exp(-Math.pow(gd(l,b,78,1)/20,1.3));
-        // 다중 옥타브 noise를 더 풍부하게 (구름 느낌)
-        const cl=fbm(lN*9,vR*7,360,5),fi=fbm(lN*22+7.1,vR*12+3.8,360,4),fc=fbm(lN*4+1.3,vR*5+2.1,360,3);
-        const rift=Math.exp(-Math.pow((b+1)/2.2,2))*Math.exp(-Math.pow(bA/16,1.1));
-        const coal=Math.exp(-Math.pow(gd(l,b,303,0)/5.5,2));
-        // 띠 모듈레이션을 덜 극단적으로
-        let lum=.012+.10*wide*(.7+.3*fc)+.30*thin*(.6+.4*cl)+.40*bulge+.18*bW+.16*sgr*(.7+.3*fi)+.14*cyg;
-        lum*=Math.max(.10,1-.65*(rift*.7+coal*.9));lum=Math.max(0,Math.min(1,lum));
-        const warm=bulge*.9+bW*.4+sgr*.5;const ls=Math.pow(lum,.92)*270;const idx=(y*W+x)*4;
-        data[idx]=Math.max(0,Math.min(255,5+ls*(.68+.38*warm)));
-        data[idx+1]=Math.max(0,Math.min(255,8+ls*(.76+.18*warm)));
-        data[idx+2]=Math.max(0,Math.min(255,17+ls*(.96-.20*warm)));
-        data[idx+3]=255;
-      }
-    }
-    res({width:W,height:H,data});
-  },0));
-  return mwProm;
-}
 
 // ── WebGL 셰이더 ───────────────────────────────────────────────────────────────
 const VERT=`attribute vec2 a;varying vec2 v;void main(){v=a*.5+.5;gl_Position=vec4(a,0,1);}`;
 const FRAG=`precision highp float;
-varying vec2 v;uniform vec2 u_r,u_c;uniform float u_s,u_a0,u_z0,u_lat,u_lst,u_op,u_moon,u_mwOp;uniform sampler2D u_sky;
-vec3 tone(vec3 c){return clamp(pow(clamp(c,0.,1.),vec3(.82))*1.08,0.,1.);}
+varying vec2 v;uniform vec2 u_r,u_c;uniform float u_s,u_a0,u_z0,u_lat,u_lst,u_moon;
 vec2 unp(vec2 sc,out float vis){
   float nx=(sc.x-u_c.x)/u_s,ny=(u_c.y-sc.y)/u_s,rho=sqrt(nx*nx+ny*ny),c=rho;
-  // 시야 가장자리는 부드럽게 페이드아웃 (검은 모서리 방지)
   if(c>3.12){vis=0.;return vec2(0.);}
   if(rho<1e-6){vis=1.;return vec2(u_a0,u_z0);}
   float a0=radians(u_a0),az0=radians(u_z0),sC=sin(c),cC=cos(c);
   float alt=asin(clamp(cC*sin(a0)+(ny*sC*cos(a0))/rho,-1.,1.));
   float az=az0+atan(nx*sC,rho*cos(a0)*cC-ny*sin(a0)*sC);
-  // 가장자리 0.4 rad 부드럽게 페이드
   vis=1.-smoothstep(2.7,3.12,c);
   return vec2(degrees(alt),mod(degrees(az)+360.,360.));
-}
-vec2 ar(vec2 aa){
-  float alt=radians(aa.x),az=radians(aa.y),lat=radians(u_lat);
-  float sD=sin(alt)*sin(lat)+cos(alt)*cos(lat)*cos(az),dec=asin(clamp(sD,-1.,1.));
-  float cD=max(cos(dec),1e-6),sH=-sin(az)*cos(alt)/cD,cH=(sin(alt)-sin(lat)*sin(dec))/max(cos(lat)*cD,1e-6);
-  return vec2(mod(u_lst*15.-degrees(atan(sH,cH))+360.,360.),degrees(dec));
 }
 vec3 atm(float a){
   float t=clamp((a+90.)/180.,0.,1.);
@@ -255,24 +195,11 @@ vec3 atm(float a){
 }
 void main(){
   vec2 sc=vec2(v.x*u_r.x,(1.-v.y)*u_r.y);float vis=0.;vec2 aa=unp(sc,vis);
-  // 시야 밖은 깊은 우주 색상 (완전 검정 X)
   vec3 outCol=vec3(.006,.010,.024);
   vec3 col=outCol;
   if(vis>.001){
-    vec3 inCol=atm(aa.x);vec2 rd=ar(aa);
-    // 은하수 텍스처를 4방향 블러로 부드럽게 (선명한 띠 제거)
-    vec2 uv=vec2(fract(rd.x/360.),clamp((90.-rd.y)/180.,0.,1.));
-    vec3 s0=texture2D(u_sky,uv).rgb;
-    vec3 s1=texture2D(u_sky,uv+vec2(.004,0.)).rgb;
-    vec3 s2=texture2D(u_sky,uv-vec2(.004,0.)).rgb;
-    vec3 s3=texture2D(u_sky,uv+vec2(0.,.006)).rgb;
-    vec3 s4=texture2D(u_sky,uv-vec2(0.,.006)).rgb;
-    vec3 sky=tone((s0*2.+s1+s2+s3+s4)/6.);
-    float am=clamp((aa.x+25.)/45.,.5,1.);sky*=am;sky.b*=mix(.65,1.,am);sky.g*=mix(.82,1.,am);
-    // 은하수 (달 위상에 따른 가시성)
-    inCol+=sky*u_op*u_mwOp;
-    // 달빛에 의한 하늘 산란 (보름달일수록 푸른 빛이 전체 하늘에)
-    float horizonFade=clamp((aa.x)/40.,0.0,1.0); // 지평선 가까울수록 더 밝게
+    vec3 inCol=atm(aa.x);
+    float horizonFade=clamp((aa.x)/40.,0.0,1.0);
     vec3 moonSky=vec3(.06,.10,.20)*(1.0+0.5*(1.0-horizonFade));
     inCol+=moonSky*u_moon*(0.6+0.4*horizonFade);
     col=mix(outCol,inCol,vis);
@@ -290,42 +217,28 @@ function createGl(canvas){
   gl.linkProgram(prog);
   const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
   gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
-  const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-  return{gl,prog,buf,tex,texUp:null,a:gl.getAttribLocation(prog,'a'),
+  return{gl,prog,buf,a:gl.getAttribLocation(prog,'a'),
     u:{r:gl.getUniformLocation(prog,'u_r'),c:gl.getUniformLocation(prog,'u_c'),
       s:gl.getUniformLocation(prog,'u_s'),a0:gl.getUniformLocation(prog,'u_a0'),
       z0:gl.getUniformLocation(prog,'u_z0'),lat:gl.getUniformLocation(prog,'u_lat'),
-      lst:gl.getUniformLocation(prog,'u_lst'),op:gl.getUniformLocation(prog,'u_op'),
-      moon:gl.getUniformLocation(prog,'u_moon'),mwOp:gl.getUniformLocation(prog,'u_mwOp'),
-      sky:gl.getUniformLocation(prog,'u_sky')}};
+      lst:gl.getUniformLocation(prog,'u_lst'),
+      moon:gl.getUniformLocation(prog,'u_moon')}};
 }
-function destroyGl(s){if(!s)return;const{gl}=s;gl.deleteBuffer(s.buf);gl.deleteTexture(s.tex);gl.deleteProgram(s.prog);}
+function destroyGl(s){if(!s)return;const{gl}=s;gl.deleteBuffer(s.buf);gl.deleteProgram(s.prog);}
 
 // 별 색상/크기
 function ciToCol(ci){if(ci<-.1)return'#c8daff';if(ci<.3)return'#eef2ff';if(ci<.6)return'#fff8f0';if(ci<1)return'#ffd8a0';return'#ffb080';}
 function magR(mag,sc){const b=mag<1?3.0:mag<1.5?2.5:mag<2?2.1:mag<2.5?1.8:mag<3?1.5:1.2;return b*Math.min(1.5,sc/200);}
 function magA(mag){return mag<1?1:mag<1.5?.97:mag<2?.93:mag<2.5?.88:mag<3?.80:.72;}
 
-// 은하수 평면 경로
-const G2E=[[-0.0548755604,0.4941094279,-0.8676661490],[-0.8734370902,-0.4448296300,-0.1980763734],[-0.4838350155,0.7469822445,0.4559837762]];
-const GAL_PATH=Array.from({length:720},(_,i)=>{
-  const l=i*.5,lr=l*Math.PI/180,gx=Math.cos(lr),gy=Math.sin(lr);
-  const ex=G2E[0][0]*gx+G2E[0][1]*gy,ey=G2E[1][0]*gx+G2E[1][1]*gy,ez=G2E[2][0]*gx+G2E[2][1]*gy;
-  let ra=Math.atan2(ey,ex)*180/Math.PI;if(ra<0)ra+=360;
-  return[ra,Math.asin(Math.max(-1,Math.min(1,ez)))*180/Math.PI];
-});
 
 const DEFAULT_FOV=72, CY=0.60;
 
 // 달 위상별 시뮬 파라미터
 const MOON_PARAMS = {
-  full: { skyBrightness: 0.85, starMagLimit: 1.8, mwVisibility: 0.05, moonRadius: 22, moonAlpha: 1.0,  ambientGlow: 0.55, label: '보름달' },
-  half: { skyBrightness: 0.35, starMagLimit: 2.7, mwVisibility: 0.12, moonRadius: 17, moonAlpha: 0.9,  ambientGlow: 0.25, label: '상현달' },
-  new:  { skyBrightness: 0.05, starMagLimit: 3.5, mwVisibility: 0.32, moonRadius:  9, moonAlpha: 0.55, ambientGlow: 0.05, label: '그믐달' },
+  full: { skyBrightness: 0.85, starMagLimit: 1.8, moonRadius: 22, moonAlpha: 1.0,  ambientGlow: 0.55, label: '보름달' },
+  half: { skyBrightness: 0.35, starMagLimit: 2.7, moonRadius: 17, moonAlpha: 0.9,  ambientGlow: 0.25, label: '상현달' },
+  new:  { skyBrightness: 0.05, starMagLimit: 3.5, moonRadius:  9, moonAlpha: 0.55, ambientGlow: 0.05, label: '그믐달' },
 };
 
 // ── 컴포넌트 ──────────────────────────────────────────────────────────────────
@@ -334,8 +247,6 @@ export default function StarMissionSkyMap({ selectedTime, moonPhase = null, inte
   const cvRef   = useRef(null);
   const contRef = useRef(null);
   const glRef   = useRef(null);
-  const mwTexRef   = useRef(null);
-  const glTexRef   = useRef(null);
   const rafRef     = useRef(null);
   const settleRef  = useRef(null);
   const interRef   = useRef(false);
@@ -350,7 +261,6 @@ export default function StarMissionSkyMap({ selectedTime, moonPhase = null, inte
   const initMin = TIME_SLOT_UTC[selectedTime] ?? 15*60;
   const [simMin, setSimMin] = useState(initMin);
   const [isLive, setIsLive] = useState(false);
-  const [mwReady, setMwReady] = useState(false);
   const [dims, setDims] = useState({ w: 760, h: 460 });
   const [ver, setVer]   = useState(0);
   const [hitResult, setHitResult] = useState(null); // { name, isPolaris, desc, x, y }
@@ -376,9 +286,6 @@ export default function StarMissionSkyMap({ selectedTime, moonPhase = null, inte
     if(settleRef.current){clearTimeout(settleRef.current);settleRef.current=null;}
     reqRender();
   },[reqRender]);
-
-  // 은하수 텍스처 로드
-  useEffect(() => { buildMW().then(t=>{mwTexRef.current=t;setMwReady(true);reqRender();}); },[reqRender]);
 
   // 별 카탈로그 (mag < 3.5만)
   useEffect(() => {
@@ -432,30 +339,21 @@ export default function StarMissionSkyMap({ selectedTime, moonPhase = null, inte
     const{w,h}=dims,dpr=Math.min(window.devicePixelRatio??1,2);
     canvas.width=w*dpr;canvas.height=h*dpr;canvas.style.width=`${w}px`;canvas.style.height=`${h}px`;
     const scale=getScale(),{az:az0,alt:alt0}=viewRef.current,cx=w/2,cy=h*CY;
-    const{gl,prog,buf,tex,u}=state,mw=mwTexRef.current;
+    const{gl,prog,buf,u}=state;
     gl.viewport(0,0,canvas.width,canvas.height);gl.disable(gl.DEPTH_TEST);gl.disable(gl.BLEND);
     gl.useProgram(prog);gl.bindBuffer(gl.ARRAY_BUFFER,buf);
     gl.enableVertexAttribArray(state.a);gl.vertexAttribPointer(state.a,2,gl.FLOAT,false,0,0);
-    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,tex);
-    if(mw&&glTexRef.current!==mw){
-      gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);
-      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,mw.width,mw.height,0,gl.RGBA,gl.UNSIGNED_BYTE,mw.data);
-      gl.generateMipmap(gl.TEXTURE_2D);glTexRef.current=mw;
-    }
     const mp=moonPhase&&MOON_PARAMS[moonPhase]?MOON_PARAMS[moonPhase]:null;
-    // 달이 지평선 아래에 있으면 하늘 밝기 줄임 (0°→1, -15°이하→0)
     const [mAltGL] = mp ? getMoonAltAz(moonPhase, simMin, SEOUL.lat) : [0];
     const moonElevFactor = mp ? Math.max(0, Math.min(1, 1 + mAltGL / 15)) : 0;
     const moonBright = mp ? mp.skyBrightness * moonElevFactor : 0;
-    const mwOp=mp?mp.mwVisibility:0.20;
-    gl.uniform1i(u.sky,0);gl.uniform2f(u.r,canvas.width,canvas.height);
+    gl.uniform2f(u.r,canvas.width,canvas.height);
     gl.uniform2f(u.c,cx*dpr,cy*dpr);gl.uniform1f(u.s,scale*dpr);
     gl.uniform1f(u.a0,alt0);gl.uniform1f(u.z0,az0);gl.uniform1f(u.lat,SEOUL.lat);
-    gl.uniform1f(u.lst,lst);gl.uniform1f(u.op,mw?0.96:0);
+    gl.uniform1f(u.lst,lst);
     if(u.moon)gl.uniform1f(u.moon,moonBright);
-    if(u.mwOp)gl.uniform1f(u.mwOp,mwOp);
     gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);gl.drawArrays(gl.TRIANGLES,0,6);
-  },[dims,ver,getScale,mwReady,lst,moonPhase]);
+  },[dims,ver,getScale,lst,moonPhase]);
 
   // ── Canvas 2D ──────────────────────────────────────────────────────────────
   useEffect(()=>{
