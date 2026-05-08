@@ -334,7 +334,7 @@ export default function StarMissionSkyMap({ selectedTime, moonPhase = null, inte
   useEffect(()=>{
     const canvas=bgRef.current;if(!canvas)return;
     let state=glRef.current;
-    if(!state||state.gl.canvas!==canvas){destroyGl(state);try{state=createGl(canvas);}catch{state=null;}glRef.current=state;glTexRef.current=null;}
+    if(!state||state.gl.canvas!==canvas){destroyGl(state);try{state=createGl(canvas);}catch{state=null;}glRef.current=state;}
     if(!state)return;
     const{w,h}=dims,dpr=Math.min(window.devicePixelRatio??1,2);
     canvas.width=w*dpr;canvas.height=h*dpr;canvas.style.width=`${w}px`;canvas.style.height=`${h}px`;
