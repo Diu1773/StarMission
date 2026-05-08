@@ -732,7 +732,6 @@ export default function StarMissionSkyMap({ selectedTime, moonPhase = null, inte
           onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp}
           onMouseLeave={()=>{dragRef.current=null;finishInter();}}/>
 
-        {!mwReady&&<div className="starmission-sky-overlay">밤하늘 생성 중…</div>}
 
         {/* 클릭 피드백 팝업 */}
         {hitResult && popupStyle && (
